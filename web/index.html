@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Accounts &amp; Quota</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0b0d13;
+      color: #f1f5f9;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+    
+    /* Clean, tasteful glassmorphism without neon glowing */
+    .glass-surface {
+      background: rgba(255, 255, 255, 0.035);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.65);
+    }
+
+    .glass-surface-active {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+    }
+
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .glass-button {
+      background: rgba(255, 255, 255, 0.06);
+      transition: all 0.15s ease;
+    }
+    .glass-button:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .action-button {
+      background: #4f46e5;
+      transition: all 0.15s ease;
+    }
+    .action-button:hover {
+      background: #4338ca;
+    }
+
+    /* Minimal Toggle Switch */
+    .switch-track {
+      background: rgba(255, 255, 255, 0.12);
+      transition: background-color 0.2s ease;
+    }
+    .switch-track.active {
+      background: #4f46e5;
+    }
+    .switch-thumb {
+      transform: translateX(2px);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .switch-thumb.active {
+      transform: translateX(18px);
+    }
+
+    /* Custom thin scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+  </style>
+</head>
+<body class="selection:bg-indigo-500/20 selection:text-indigo-200 min-h-screen flex flex-col">
+
+  <!-- Toast Notification Pill -->
+  <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 transform transition-all duration-300 -translate-y-20 opacity-0 pointer-events-none">
+    <div id="toast-content" class="glass-pill px-5 py-2 rounded-full flex items-center space-x-2.5 shadow-lg bg-slate-900/90 text-xs text-slate-200">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+      <span id="toast-message">Notification message</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="sticky top-4 z-40 px-4 sm:px-6 w-full max-w-6xl mx-auto">
+    <div class="glass-pill rounded-full px-6 py-3 flex items-center justify-between">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-indigo-400 flex-shrink-0">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-semibold tracking-tight text-slate-100">
+            Gemini Accounts
+          </h1>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2.5">
+        <!-- Live Status -->
+        <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-white/[0.03] text-[11px] text-slate-400 font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span id="header-status-text">5 Accounts Synced</span>
+        </div>
+
+        <!-- Refresh Button -->
+        <button onclick="refreshAllQuotas()" id="btn-refresh" class="glass-button p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium text-slate-300 flex items-center space-x-1.5" title="Refresh Live Quotas">
+          <svg id="icon-refresh" class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span class="hidden sm:inline">Refresh</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button onclick="toggleSettingsModal(true)" class="glass-button p-2 rounded-full text-slate-400 hover:text-slate-200" title="Preferences">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </button>
+
+        <!-- Sign In New Account -->
+        <button onclick="startGoogleAuth()" class="action-button px-4 py-1.5 rounded-full text-xs font-medium text-white flex items-center space-x-1.5 shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>Add Account</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 flex-1 space-y-7">
+
+    <!-- Active Spotlight Island -->
+    <div class="glass-surface-active rounded-3xl p-6 transition-all duration-200">
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        
+        <!-- Active User Profile -->
+        <div class="flex items-center space-x-4">
+          <div class="relative">
+            <img id="hero-avatar" class="w-12 h-12 rounded-full object-cover bg-slate-800" src="https://lh3.googleusercontent.com/a/default-user" alt="Avatar">
+            <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#0b0d13]"></span>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h2 id="hero-name" class="text-base font-semibold text-slate-100 tracking-tight">Active Account</h2>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-400">Active</span>
+            </div>
+            <p id="hero-email" class="text-xs text-slate-400 font-mono mt-0.5">user@example.com</p>
+          </div>
+        </div>
+
+        <!-- Quota Metrics Cards -->
+        <div class="grid grid-cols-2 gap-3.5 w-full md:w-auto">
+          <!-- 5-Hour Limit -->
+          <div class="glass-surface rounded-2xl px-4 py-3 min-w-[160px]">
+            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1.5 font-medium">
+              <span>5-Hour Quota</span>
+              <span id="hero-5h-percent" class="font-mono text-emerald-400 font-semibold text-xs">--%</span>
+            </div>
+            <div class="w-full bg-white/[0.06] rounded-full h-1 overflow-hidden">
+              <div id="hero-5h-bar" class="h-1 rounded-full bg-emerald-400 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-500 font-mono flex justify-between">
+              <span>Reset</span>
+              <span id="hero-5h-countdown" class="text-slate-300">--</span>
+            </div>
+          </div>
+
+          <!-- Weekly Limit -->
+          <div class="glass-surface rounded-2xl px-4 py-3 min-w-[160px]">
+            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1.5 font-medium">
+              <span>Weekly Tier</span>
+              <span id="hero-weekly-percent" class="font-mono text-indigo-400 font-semibold text-xs">--%</span>
+            </div>
+            <div class="w-full bg-white/[0.06] rounded-full h-1 overflow-hidden">
+              <div id="hero-weekly-bar" class="h-1 rounded-full bg-indigo-400 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-500 font-mono flex justify-between">
+              <span>Reset</span>
+              <span id="hero-weekly-countdown" class="text-slate-300">--</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Accounts Header -->
+    <div class="flex items-center justify-between pt-1">
+      <div class="flex items-center space-x-2.5">
+        <h3 class="text-sm font-semibold text-slate-200">Connected Accounts</h3>
+        <span id="accounts-count" class="px-2 py-0.5 rounded-full bg-white/[0.05] text-xs font-mono text-slate-400">5</span>
+      </div>
+
+      <span class="text-xs text-slate-500 font-mono hidden sm:inline">1-Click Local Switch</span>
+    </div>
+
+    <!-- Accounts Grid -->
+    <div id="accounts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Loading Skeleton -->
+      <div class="glass-surface rounded-2xl p-5 animate-pulse space-y-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-full bg-slate-800"></div>
+          <div class="space-y-1.5 flex-1">
+            <div class="h-3.5 bg-slate-800 rounded w-1/2"></div>
+            <div class="h-3 bg-slate-800 rounded w-3/4"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quota Runway Analytics (Collapsible) -->
+    <div class="glass-surface rounded-2xl p-5 transition-all duration-200">
+      <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleAnalytics()">
+        <div class="flex items-center space-x-3">
+          <div class="w-7 h-7 rounded-full bg-white/[0.04] flex items-center justify-center text-slate-400">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+            </svg>
+          </div>
+          <div>
+            <h4 class="text-xs font-medium text-slate-200">Quota Runway History</h4>
+            <p class="text-[11px] text-slate-500">Usage rate and capacity curve</p>
+          </div>
+        </div>
+        
+        <div class="flex items-center space-x-1.5 text-xs text-slate-400">
+          <span id="analytics-toggle-text">Show Graph</span>
+          <svg id="analytics-chevron" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div id="analytics-body" class="hidden mt-5 pt-4 border-t border-white/[0.04]">
+        <div class="h-40 w-full">
+          <canvas id="burnChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Preferences Modal -->
+  <div id="settings-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-surface max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-5 bg-[#0f1118]">
+      <div class="flex justify-between items-center">
+        <h3 class="text-sm font-semibold text-slate-100">Preferences</h3>
+        <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white">&times;</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5">Auto-Refresh Interval</label>
+          <select id="setting-refresh-interval" class="w-full bg-slate-800/80 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none">
+            <option value="30">Every 30 seconds</option>
+            <option value="60">Every 60 seconds (Recommended)</option>
+            <option value="120">Every 2 minutes</option>
+            <option value="0">Manual only</option>
+          </select>
+        </div>
+
+        <div class="pt-2">
+          <!-- Smart Auto Switch -->
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="text-xs font-medium text-slate-200">Smart Auto-Switch</div>
+              <div class="text-[11px] text-slate-500">Auto hot-swap if 5h capacity falls low</div>
+            </div>
+            <label class="relative cursor-pointer select-none">
+              <input type="checkbox" id="setting-auto-switch" class="sr-only">
+              <div id="modal-switch-track" class="w-9 h-5 rounded-full switch-track flex items-center">
+                <div id="modal-switch-thumb" class="w-3.5 h-3.5 rounded-full bg-white shadow-sm switch-thumb"></div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Windows Startup Switch -->
+          <div class="flex items-center justify-between mb-3 pt-2 border-t border-white/[0.04]">
+            <div>
+              <div class="text-xs font-medium text-slate-200">Run on Windows Startup</div>
+              <div class="text-[11px] text-slate-500">Launch background service with Windows</div>
+            </div>
+            <label class="relative cursor-pointer select-none">
+              <input type="checkbox" id="setting-startup" class="sr-only">
+              <div id="startup-switch-track" class="w-9 h-5 rounded-full switch-track flex items-center">
+                <div id="startup-switch-thumb" class="w-3.5 h-3.5 rounded-full bg-white shadow-sm switch-thumb"></div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Start Minimized Switch -->
+          <div class="flex items-center justify-between mb-3 pt-2 border-t border-white/[0.04]">
+            <div>
+              <div class="text-xs font-medium text-slate-200">Start Minimized</div>
+              <div class="text-[11px] text-slate-500">Start silently in System Tray</div>
+            </div>
+            <label class="relative cursor-pointer select-none">
+              <input type="checkbox" id="setting-minimized" class="sr-only">
+              <div id="minimized-switch-track" class="w-9 h-5 rounded-full switch-track flex items-center">
+                <div id="minimized-switch-thumb" class="w-3.5 h-3.5 rounded-full bg-white shadow-sm switch-thumb"></div>
+              </div>
+            </label>
+          </div>
+
+          <label class="block text-xs text-slate-400 mb-1.5 mt-3">Failover Threshold</label>
+          <select id="setting-switch-threshold" class="w-full bg-slate-800/80 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none">
+            <option value="0.05">Below 5% remaining</option>
+            <option value="0.10">Below 10% remaining</option>
+            <option value="0.15">Below 15% remaining</option>
+          </select>
+
+          <!-- Launch App Window button -->
+          <div class="pt-3 border-t border-white/[0.04] flex items-center justify-between">
+            <div>
+              <div class="text-xs font-medium text-slate-200">Standalone App Window</div>
+              <div class="text-[11px] text-slate-500">Borderless lightweight window</div>
+            </div>
+            <button onclick="openStandaloneApp()" class="glass-button px-3 py-1.5 rounded-full text-xs text-indigo-300 hover:text-white">Open App</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="toggleSettingsModal(false)" class="glass-button px-3.5 py-1.5 rounded-full text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+        <button onclick="saveSettings()" class="action-button px-4 py-1.5 rounded-full text-xs font-medium text-white">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal Footer -->
+  <footer class="py-5 text-center text-xs text-slate-500 font-mono">
+    <span>Local Antigravity Quota Manager</span>
+  </footer>
+
+  <script>
+    let appState = { activeEmail: '', accounts: [], settings: {} };
+    let chartInstance = null;
+
+    function updateModalSwitchUI(isChecked) {
+      const track = document.getElementById('modal-switch-track');
+      const thumb = document.getElementById('modal-switch-thumb');
+      if (isChecked) {
+        track.classList.add('active');
+        thumb.classList.add('active');
+      } else {
+        track.classList.remove('active');
+        thumb.classList.remove('active');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const msgElem = document.getElementById('toast-message');
+      msgElem.innerText = msg;
+      toast.classList.remove('-translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('-translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    function formatTime(isoString) {
+      if (!isoString) return '--';
+      const diff = new Date(isoString).getTime() - Date.now();
+      if (diff <= 0) return 'Resetting';
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      if (hours >= 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+      return `${hours}h ${minutes}m`;
+    }
+
+    async function loadAccounts() {
+      try {
+        const res = await fetch('/api/accounts');
+        const data = await res.json();
+        appState.activeEmail = data.active_email || '';
+        appState.accounts = data.accounts || [];
+        appState.settings = data.settings || {};
+        renderUI();
+      } catch (err) {
+        console.error('Failed to load accounts:', err);
+      }
+    }
+
+    function renderUI() {
+      const accounts = appState.accounts;
+      const activeEmail = appState.activeEmail;
+
+      document.getElementById('accounts-count').innerText = accounts.length;
+      document.getElementById('header-status-text').innerText = `${accounts.length} Accounts Synced`;
+
+      // Hero active account
+      const activeAcc = accounts.find(a => a.is_active || (a.email.toLowerCase() === activeEmail.toLowerCase())) || accounts[0];
+      if (activeAcc) {
+        document.getElementById('hero-name').innerText = activeAcc.name || activeAcc.email;
+        document.getElementById('hero-email').innerText = activeAcc.email;
+        if (activeAcc.picture) {
+          document.getElementById('hero-avatar').src = activeAcc.picture;
+        }
+
+        const geminiGroup = (activeAcc.quota?.groups || []).find(g => g.displayName?.toLowerCase().includes('gemini'));
+        if (geminiGroup) {
+          const b5h = geminiGroup.buckets?.find(b => b.window === '5h' || b.bucketId?.includes('5h'));
+          const bWeekly = geminiGroup.buckets?.find(b => b.window === 'weekly' || b.bucketId?.includes('weekly'));
+
+          if (b5h) {
+            const pct = Math.round((b5h.remainingFraction ?? 1) * 100);
+            document.getElementById('hero-5h-percent').innerText = `${pct}%`;
+            document.getElementById('hero-5h-bar').style.width = `${pct}%`;
+            document.getElementById('hero-5h-countdown').innerText = formatTime(b5h.resetTime);
+          }
+
+          if (bWeekly) {
+            const pct = Math.round((bWeekly.remainingFraction ?? 1) * 100);
+            document.getElementById('hero-weekly-percent').innerText = `${pct}%`;
+            document.getElementById('hero-weekly-bar').style.width = `${pct}%`;
+            document.getElementById('hero-weekly-countdown').innerText = formatTime(bWeekly.resetTime);
+          }
+        }
+      }
+
+      // Accounts Grid
+      const container = document.getElementById('accounts-grid');
+      container.innerHTML = '';
+
+      accounts.forEach(acc => {
+        const isActive = acc.is_active || (acc.email.toLowerCase() === activeEmail.toLowerCase());
+        const gemGrp = (acc.quota?.groups || []).find(g => g.displayName?.toLowerCase().includes('gemini'));
+        const b5h = gemGrp?.buckets?.find(b => b.window === '5h' || b.bucketId?.includes('5h'));
+        const bW = gemGrp?.buckets?.find(b => b.window === 'weekly' || b.bucketId?.includes('weekly'));
+
+        const pct5h = b5h ? Math.round(b5h.remainingFraction * 100) : 100;
+        const pctW = bW ? Math.round(bW.remainingFraction * 100) : 0;
+
+        const card = document.createElement('div');
+        card.className = `${isActive ? 'glass-surface-active' : 'glass-surface'} rounded-2xl p-5 flex flex-col justify-between`;
+
+        card.innerHTML = `
+          <div>
+            <!-- Header -->
+            <div class="flex items-start justify-between pb-3">
+              <div class="flex items-center space-x-3 min-w-0">
+                <img class="w-9 h-9 rounded-full object-cover bg-slate-800 ${isActive ? 'ring-2 ring-indigo-500/50' : ''}" 
+                     src="${acc.picture || 'https://lh3.googleusercontent.com/a/default-user'}" alt="Avatar">
+                <div class="min-w-0">
+                  <h4 class="text-xs font-semibold text-slate-200 truncate">${acc.name || acc.email}</h4>
+                  <p class="text-[11px] text-slate-400 font-mono truncate mt-0.5">${acc.email}</p>
+                </div>
+              </div>
+
+              ${isActive ? `
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-500/10 text-emerald-400 flex items-center space-x-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span>Active</span>
+                </span>
+              ` : `
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-white/[0.03]">Standby</span>
+              `}
+            </div>
+
+            <!-- Quota Bars -->
+            <div class="space-y-3 py-2">
+              <div>
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-slate-400 text-[11px]">5-Hour Rolling</span>
+                  <span class="font-mono text-xs font-medium ${pct5h < 20 ? 'text-rose-400' : (pct5h < 50 ? 'text-amber-400' : 'text-emerald-400')}">${pct5h}%</span>
+                </div>
+                <div class="w-full bg-white/[0.06] rounded-full h-1 overflow-hidden">
+                  <div class="h-1 rounded-full ${pct5h < 20 ? 'bg-rose-500' : (pct5h < 50 ? 'bg-amber-400' : 'bg-emerald-400')} transition-all duration-300" style="width: ${pct5h}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                  <span>Rolling window</span>
+                  <span>${b5h ? 'Resets ' + formatTime(b5h.resetTime) : '--'}</span>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-slate-400 text-[11px]">Weekly Limit</span>
+                  <span class="font-mono text-xs font-medium ${pctW < 20 ? 'text-rose-400' : (pctW < 50 ? 'text-amber-400' : 'text-slate-300')}">${pctW}%</span>
+                </div>
+                <div class="w-full bg-white/[0.06] rounded-full h-1 overflow-hidden">
+                  <div class="h-1 rounded-full ${pctW < 20 ? 'bg-rose-500' : (pctW < 50 ? 'bg-amber-400' : 'bg-indigo-400')} transition-all duration-300" style="width: ${pctW}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
+                  <span>Tier reset</span>
+                  <span>${bW ? 'Resets ' + formatTime(bW.resetTime) : '--'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Action -->
+          <div class="pt-3">
+            ${isActive ? `
+              <div class="w-full py-1.5 rounded-full text-center text-xs font-medium text-slate-400 bg-white/[0.04] cursor-default">
+                In Use
+              </div>
+            ` : `
+              <button onclick="switchAccount('${acc.email}')" class="w-full action-button py-1.5 rounded-full text-xs font-medium text-white flex items-center justify-center space-x-1.5 shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                <span>Switch to this</span>
+              </button>
+            `}
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    async function switchAccount(email) {
+      showToast(`Switching to ${email}...`);
+      try {
+        const res = await fetch('/api/accounts/switch', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ email: email, restart_language_server: true })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`Switched to ${email}`);
+          await loadAccounts();
+        } else {
+          showToast(`Switch failed: ${data.error}`);
+        }
+      } catch (err) {
+        showToast(`Switch error: ${err}`);
+      }
+    }
+
+    async function refreshAllQuotas() {
+      showToast("Syncing quotas...");
+      try {
+        await fetch('/api/accounts/refresh-all', { method: 'POST' });
+        await loadAccounts();
+        showToast("Quotas updated");
+      } catch (e) {
+        showToast(`Sync failed: ${e}`);
+      }
+    }
+
+    async function startGoogleAuth() {
+      showToast("Opening Google Sign-In...");
+      try {
+        const res = await fetch('/api/auth/start?open=true');
+        const data = await res.json();
+        if (data.auth_url) window.open(data.auth_url, '_blank', 'width=600,height=700');
+        let tries = 0;
+        const poller = setInterval(async () => {
+          tries++;
+          await loadAccounts();
+          if (tries > 20) clearInterval(poller);
+        }, 3000);
+      } catch (e) {
+        showToast(`Auth error: ${e}`);
+      }
+    }
+
+    function updateTrackAndThumb(trackId, thumbId, isChecked) {
+      const track = document.getElementById(trackId);
+      const thumb = document.getElementById(thumbId);
+      if (!track || !thumb) return;
+      if (isChecked) {
+        track.classList.add('active');
+        thumb.classList.add('active');
+      } else {
+        track.classList.remove('active');
+        thumb.classList.remove('active');
+      }
+    }
+
+    function updateModalSwitchUI(isChecked) {
+      updateTrackAndThumb('modal-switch-track', 'modal-switch-thumb', isChecked);
+    }
+    function updateStartupSwitchUI(isChecked) {
+      updateTrackAndThumb('startup-switch-track', 'startup-switch-thumb', isChecked);
+    }
+    function updateMinimizedSwitchUI(isChecked) {
+      updateTrackAndThumb('minimized-switch-track', 'minimized-switch-thumb', isChecked);
+    }
+
+    async function toggleSettingsModal(show) {
+      const m = document.getElementById('settings-modal');
+      if (show) {
+        document.getElementById('setting-refresh-interval').value = appState.settings?.auto_refresh_seconds ?? 60;
+        const isAuto = appState.settings?.auto_switch_enabled ?? false;
+        document.getElementById('setting-auto-switch').checked = isAuto;
+        updateModalSwitchUI(isAuto);
+        document.getElementById('setting-switch-threshold').value = appState.settings?.auto_switch_threshold ?? 0.05;
+
+        // Fetch app config (startup & minimized)
+        try {
+          const res = await fetch('/api/app/config');
+          const cfg = await res.json();
+          document.getElementById('setting-startup').checked = cfg.run_on_startup;
+          updateStartupSwitchUI(cfg.run_on_startup);
+          document.getElementById('setting-minimized').checked = cfg.start_minimized;
+          updateMinimizedSwitchUI(cfg.start_minimized);
+        } catch (e) {}
+
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+      } else {
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+      }
+    }
+
+    document.getElementById('setting-auto-switch')?.addEventListener('change', function() {
+      updateModalSwitchUI(this.checked);
+    });
+    document.getElementById('setting-startup')?.addEventListener('change', function() {
+      updateStartupSwitchUI(this.checked);
+    });
+    document.getElementById('setting-minimized')?.addEventListener('change', function() {
+      updateMinimizedSwitchUI(this.checked);
+    });
+
+    async function openStandaloneApp() {
+      showToast("Launching Standalone Desktop Window...");
+      try {
+        await fetch('/api/app/open-window', { method: 'POST' });
+      } catch (e) {
+        showToast("Error opening window");
+      }
+    }
+
+    async function saveSettings() {
+      const interval = parseInt(document.getElementById('setting-refresh-interval').value);
+      const autoSwitch = document.getElementById('setting-auto-switch').checked;
+      const threshold = parseFloat(document.getElementById('setting-switch-threshold').value);
+      const startup = document.getElementById('setting-startup').checked;
+      const minimized = document.getElementById('setting-minimized').checked;
+
+      try {
+        // Save core settings
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ auto_refresh_seconds: interval, auto_switch_enabled: autoSwitch, auto_switch_threshold: threshold })
+        });
+        const data = await res.json();
+
+        // Save app startup settings
+        await fetch('/api/app/config', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ run_on_startup: startup, start_minimized: minimized })
+        });
+
+        if (data.success) {
+          appState.settings = data.settings;
+          toggleSettingsModal(false);
+          showToast("Preferences & Startup saved");
+        }
+      } catch (e) {
+        showToast(`Error: ${e}`);
+      }
+    }
+
+    function toggleAnalytics() {
+      const body = document.getElementById('analytics-body');
+      const chevron = document.getElementById('analytics-chevron');
+      const text = document.getElementById('analytics-toggle-text');
+
+      if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+        text.innerText = 'Hide Graph';
+        renderBurnChart();
+      } else {
+        body.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+        text.innerText = 'Show Graph';
+      }
+    }
+
+    function renderBurnChart() {
+      const activeAcc = appState.accounts.find(a => a.is_active) || appState.accounts[0];
+      if (!activeAcc) return;
+
+      const history = activeAcc.history || [];
+      const labels = history.map(h => new Date(h.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+      const data5h = history.map(h => Math.round(h.h5_remaining * 100));
+      const dataWeekly = history.map(h => Math.round(h.weekly_remaining * 100));
+
+      const ctx = document.getElementById('burnChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.length ? labels : ['Current'],
+          datasets: [
+            {
+              label: '5-Hour Limit %',
+              data: data5h.length ? data5h : [91],
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.06)',
+              tension: 0.3,
+              fill: true,
+              borderWidth: 1.5,
+              pointRadius: 2
+            },
+            {
+              label: 'Weekly Limit %',
+              data: dataWeekly.length ? dataWeekly : [50],
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99, 102, 241, 0.04)',
+              tension: 0.3,
+              fill: true,
+              borderWidth: 1.5,
+              pointRadius: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { min: 0, max: 100, grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: 'rgba(255, 255, 255, 0.35)' } },
+            x: { grid: { color: 'rgba(255, 255, 255, 0.03)' }, ticks: { color: 'rgba(255, 255, 255, 0.35)' } }
+          },
+          plugins: {
+            legend: { labels: { color: 'rgba(255, 255, 255, 0.6)', font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadAccounts();
+      setInterval(loadAccounts, 20000);
+    });
+  </script>
+</body>
+</html>

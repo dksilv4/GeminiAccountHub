@@ -1,0 +1,2 @@
+# Gemini Account Hub requires zero external pip dependencies!
+# It runs 100% on Python 3.10+ Standard Library (ctypes, http.server, urllib, json, winreg).

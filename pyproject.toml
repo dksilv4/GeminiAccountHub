@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemini-account-hub"
+version = "1.0.0"
+description = "Lightweight desktop dashboard and local switcher for multiple Google accounts and Gemini coding quotas in Antigravity."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["gemini", "antigravity", "quota", "google-account-switcher", "ai-coding", "cloud-code"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: User Interfaces",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-username/gemini-account-hub"
+Repository = "https://github.com/your-username/gemini-account-hub.git"
+Issues = "https://github.com/your-username/gemini-account-hub/issues"
